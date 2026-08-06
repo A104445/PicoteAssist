@@ -11,11 +11,6 @@ export default defineConfig({
   ],
   server: {
     // Redireciona os pedidos /api para o backend local durante o desenvolvimento
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8000',
-        changeOrigin: true
-      }
-    }
+    
   }
 })

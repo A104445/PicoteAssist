@@ -161,7 +161,8 @@ const enviarParaOPython = async () => {
   window.scrollTo(0, document.body.scrollHeight)
 
   try {
-    const resposta = await fetch('http://127.0.0.1:8000/api/chat', {
+    // Substitui pelo teu URL exato do Render
+    const resposta = await fetch('https://picote-assist-api.onrender.com/api/chat', { 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: texto })
