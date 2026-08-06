@@ -322,4 +322,32 @@ const enviarParaOPython = async () => {
 .hover-effect { transition: transform 0.2s; }
 .hover-effect:hover { transform: scale(1.1); }
 html, body { scroll-behavior: smooth; }
+
+/* =========================================
+   AJUSTES PARA DISPOSITIVOS MÓVEIS (PWA)
+   ========================================= */
+   @media (max-width: 768px) {
+  /* No telemóvel, aumentamos drasticamente o tamanho em vw 
+     para compensar a falta de largura do ecrã */
+  .blob-1 {
+    top: -5%;
+    left: -30%;
+    width: 130vw; 
+    height: 130vw;
+  }
+  
+  .blob-2 {
+    bottom: -5%;
+    right: -30%;
+    width: 140vw;
+    height: 140vw;
+  }
+  
+  .blob-3 {
+    top: 30%;
+    left: -15%;
+    width: 120vw;
+    height: 120vw;
+  }
+}
 </style>
