@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+node_modules/
+dist/
+.env
+.env.local
+.vscode/
+.idea/
+token.json
+credentials.json
