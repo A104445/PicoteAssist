@@ -216,7 +216,7 @@ const enviarParaOPython = async () => {
   left: -10%;
   width: 50vw;
   height: 50vw;
-  background: #a8ffe1;
+  background: #58fa7b;
   animation-delay: 0s;
 }
 
@@ -226,7 +226,7 @@ const enviarParaOPython = async () => {
   right: -10%;
   width: 60vw;
   height: 60vw;
-  background: #fce1c3;
+  background: #ffc37e;
   animation-delay: -3s;
 }
 
@@ -236,7 +236,7 @@ const enviarParaOPython = async () => {
   left: 20%;
   width: 40vw;
   height: 40vw;
-  background: #c2e9fb;
+  background: #74cff9;
   animation-delay: -6s;
 }
 
