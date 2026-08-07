@@ -96,6 +96,7 @@
 
 <script setup>
 import { ref, nextTick } from 'vue'
+import { marked } from 'marked'
 
 const newMessage = ref('')
 const isLoading = ref(false)
@@ -134,7 +135,7 @@ const startVoiceRecognition = () => {
     isListening.value = false
     // Se quiseres que ele envie automaticamente após falares, 
     // podes descomentar a linha abaixo:
-    // enviarParaOPython() 
+    enviarParaOPython() 
   }
 
   recognition.start()
@@ -146,7 +147,8 @@ const chatHistory = ref([
 
 const formatText = (text) => {
   if (!text) return ''
-  return text.replace(/\n/g, '<br>')
+  // O marked converte automaticamente os **, listas e links para HTML perfeito!
+  return marked.parse(text) 
 }
 
 const enviarParaOPython = async () => {
