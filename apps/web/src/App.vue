@@ -155,6 +155,7 @@ const enviarParaOPython = async () => {
   const texto = newMessage.value.trim()
   if (!texto) return
 
+  // 1. Adicionamos a mensagem ao ecrã (como já tinhas)
   chatHistory.value.push({ role: 'user', content: texto })
   newMessage.value = ''
   isLoading.value = true
@@ -162,25 +163,36 @@ const enviarParaOPython = async () => {
   await nextTick()
   window.scrollTo(0, document.body.scrollHeight)
 
+  // 2. PREPARAR A MEMÓRIA: Copiamos o histórico (exceto a mensagem atual que acabámos de adicionar)
+  // e formatamos para o padrão que o teu backend em Python espera.
+  const historicoParaEnviar = chatHistory.value
+    .slice(0, -1) // Ignora a última mensagem para não ir duplicada
+    .map(msg => ({
+      role: msg.role === 'assistant' ? 'model' : 'user', // O Gemini precisa que seja 'model'
+      text: msg.content // O Python está à procura da chave 'text'
+    }))
+
   try {
-    // Substitui pelo teu URL exato do Render
-    const resposta = await fetch('https://picote-assist-api.onrender.com/api/chat', { 
+    const resposta = await fetch('https://picote-assist-api.onrender.com/api/chat', { // Usa o teu link real do Render aqui
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: texto })
+      body: JSON.stringify({ 
+        message: texto, 
+        history: historicoParaEnviar // <-- 3. Enviamos a memória para o backend!
+      })
     })
 
     if (!resposta.ok) throw new Error('Erro do servidor Python')
-
+    
     const dados = await resposta.json()
     chatHistory.value.push({ role: 'assistant', content: dados.response })
 
   } catch (erro) {
     console.error("Erro:", erro)
     chatHistory.value.push({ 
-      role: 'assistant', 
-      content: 'Ups, perdi a ligação à base! O servidor Python está a correr?' 
-    })
+       role: 'assistant', 
+       content: 'Ups, perdi a ligação à base! O servidor Python está a correr?' 
+     })
   } finally {
     isLoading.value = false
     await nextTick()
