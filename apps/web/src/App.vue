@@ -173,7 +173,8 @@ const enviarParaOPython = async () => {
     }))
 
   try {
-    const resposta = await fetch('https://picote-assist-api.onrender.com/api/chat', { // Usa o teu link real do Render aqui
+    // const resposta = await fetch('https://picote-assist-api.onrender.com/api/chat'
+    const resposta = await fetch('http://localhost:8000/api/chat', { // Usa o teu link real do Render aqui
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
