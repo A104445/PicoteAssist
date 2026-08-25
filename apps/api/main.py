@@ -210,21 +210,37 @@ oauth_state = {}
 
 @app.get("/api/google/login")
 def login_google():
-    flow = Flow.from_client_secrets_file(
-        CLIENT_SECRETS_FILE,
-        scopes=SCOPES,
-        redirect_uri=f'{BACKEND_URL}/api/google/callback' 
-    )
+    # Verifica se estamos na nuvem ou no PC local
+    if os.path.exists(CLIENT_SECRETS_FILE):
+        # Lê a partir do ficheiro físico (ideal para localhost)
+        flow = Flow.from_client_secrets_file(
+            CLIENT_SECRETS_FILE,
+            scopes=SCOPES,
+            redirect_uri=f'{BACKEND_URL}/api/google/callback' 
+        )
+    else:
+        # Lê a partir das variáveis de ambiente do Render (ideal para produção)
+        client_config = {
+            "web": {
+                "client_id": os.environ.get("GOOGLE_CLIENT_ID"),
+                "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET"),
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "redirect_uris": [f"{BACKEND_URL}/api/google/callback"]
+            }
+        }
+        flow = Flow.from_client_config(
+            client_config,
+            scopes=SCOPES,
+            redirect_uri=f'{BACKEND_URL}/api/google/callback'
+        )
     
-    # A Google agora exige que guardemos o "state" e o "code_verifier" (PKCE)
     auth_url, state = flow.authorization_url(prompt='consent', access_type='offline')
     
-    # Guardamos os dados de segurança na nossa variável de memória
     oauth_state['state'] = state
     oauth_state['code_verifier'] = flow.code_verifier
     
     return RedirectResponse(auth_url)
-
 
 @app.get("/api/google/callback")
 def google_callback(request: Request):
