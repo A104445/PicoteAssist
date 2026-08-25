@@ -47,6 +47,7 @@ SCOPES = [
     'https://www.googleapis.com/auth/userinfo.profile'
 ]
 CLIENT_SECRETS_FILE = "credentials.json"
+TOKEN_FILE = "token.json"
 
 # Vai buscar o URL da Nuvem. Se não existir no .env, assume o localhost para testares no PC.
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
