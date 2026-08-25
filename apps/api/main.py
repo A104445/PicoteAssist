@@ -243,43 +243,36 @@ def login_google():
     return RedirectResponse(auth_url)
 
 @app.get("/api/google/callback")
-def google_callback(request: Request):
-    # Lemos o state que a Google enviou de volta no link
-    state = request.query_params.get("state")
-    
-    flow = Flow.from_client_secrets_file(
-        CLIENT_SECRETS_FILE,
-        scopes=SCOPES,
-        state=state,  # Passamos o state para validar a segurança
-        redirect_uri=f'{BACKEND_URL}/api/google/callback'
-    )
-    
-    # Injetamos o "código secreto" original que guardámos no login
-    flow.code_verifier = oauth_state.get('code_verifier')
-    
-    # O Render/Vercel usam HTTPS, forçamos essa conversão por segurança
-    authorization_response = str(request.url).replace("http://", "https://") if "localhost" not in BACKEND_URL else str(request.url)
-    
-    # Agora sim, a Google vai aceitar o pedido!
-    flow.fetch_token(authorization_response=authorization_response) 
-    credentials = flow.credentials
-    
-    with open('token.json', 'w') as token_file:
-        token_file.write(credentials.to_json())
-        
-    try:
-        # Pede à Google a foto de perfil usando a chave que acabámos de gerar
-        resposta_perfil = requests.get(
-            "https://www.googleapis.com/oauth2/v1/userinfo?alt=json",
-            headers={"Authorization": f"Bearer {credentials.token}"}
+def google_callback(request: Request, code: str = None, state: str = None):
+    # Verifica se o ficheiro físico existe (Local vs Render)
+    if os.path.exists(CLIENT_SECRETS_FILE):
+        flow = Flow.from_client_secrets_file(
+            CLIENT_SECRETS_FILE,
+            scopes=SCOPES,
+            redirect_uri=f'{BACKEND_URL}/api/google/callback'
         )
-        foto_url = resposta_perfil.json().get("picture", "")
-    except Exception as e:
-        print(f"Erro ao buscar foto: {e}")
-        foto_url = ""
-        
-    print("-> TOKEN E FOTO GUARDADOS COM SUCESSO!")
+    else:
+        client_config = {
+            "web": {
+                "client_id": os.environ.get("GOOGLE_CLIENT_ID"),
+                "client_secret": os.environ.get("GOOGLE_CLIENT_SECRET"),
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "redirect_uris": [f"{BACKEND_URL}/api/google/callback"]
+            }
+        }
+        flow = Flow.from_client_config(
+            client_config,
+            scopes=SCOPES,
+            redirect_uri=f'{BACKEND_URL}/api/google/callback'
+        )
+
+    flow.fetch_token(code=code)
+    creds = flow.credentials
     
-    # Redireciona de volta para o teu Vue, passando o link da foto escondido no URL
-    url_destino = f"{FRONTEND_URL}?avatar={foto_url}" if foto_url else FRONTEND_URL
-    return RedirectResponse(url_destino)
+    # Guarda o token gerado
+    with open(TOKEN_FILE, 'w') as token:
+        token.write(creds.to_json())
+        
+    # Redireciona de volta para o frontend no Vercel
+    return RedirectResponse(url=f"{FRONTEND_URL}/")
