@@ -210,16 +210,14 @@ oauth_state = {}
 
 @app.get("/api/google/login")
 def login_google():
-    # Verifica se estamos na nuvem ou no PC local
     if os.path.exists(CLIENT_SECRETS_FILE):
-        # Lê a partir do ficheiro físico (ideal para localhost)
         flow = Flow.from_client_secrets_file(
             CLIENT_SECRETS_FILE,
             scopes=SCOPES,
-            redirect_uri=f'{BACKEND_URL}/api/google/callback' 
+            redirect_uri=f'{BACKEND_URL}/api/google/callback',
+            autogenerate_code_verifier=False  # <-- Desativa o PKCE problemático
         )
     else:
-        # Lê a partir das variáveis de ambiente do Render (ideal para produção)
         client_config = {
             "web": {
                 "client_id": os.environ.get("GOOGLE_CLIENT_ID"),
@@ -232,24 +230,22 @@ def login_google():
         flow = Flow.from_client_config(
             client_config,
             scopes=SCOPES,
-            redirect_uri=f'{BACKEND_URL}/api/google/callback'
+            redirect_uri=f'{BACKEND_URL}/api/google/callback',
+            autogenerate_code_verifier=False  # <-- Desativa o PKCE problemático
         )
     
     auth_url, state = flow.authorization_url(prompt='consent', access_type='offline')
-    
-    oauth_state['state'] = state
-    oauth_state['code_verifier'] = flow.code_verifier
-    
     return RedirectResponse(auth_url)
+
 
 @app.get("/api/google/callback")
 def google_callback(request: Request, code: str = None, state: str = None):
-    # Verifica se o ficheiro físico existe (Local vs Render)
     if os.path.exists(CLIENT_SECRETS_FILE):
         flow = Flow.from_client_secrets_file(
             CLIENT_SECRETS_FILE,
             scopes=SCOPES,
-            redirect_uri=f'{BACKEND_URL}/api/google/callback'
+            redirect_uri=f'{BACKEND_URL}/api/google/callback',
+            autogenerate_code_verifier=False  # <-- Desativa o PKCE problemático
         )
     else:
         client_config = {
@@ -264,15 +260,14 @@ def google_callback(request: Request, code: str = None, state: str = None):
         flow = Flow.from_client_config(
             client_config,
             scopes=SCOPES,
-            redirect_uri=f'{BACKEND_URL}/api/google/callback'
+            redirect_uri=f'{BACKEND_URL}/api/google/callback',
+            autogenerate_code_verifier=False  # <-- Desativa o PKCE problemático
         )
 
     flow.fetch_token(code=code)
     creds = flow.credentials
     
-    # Guarda o token gerado
     with open(TOKEN_FILE, 'w') as token:
         token.write(creds.to_json())
         
-    # Redireciona de volta para o frontend no Vercel
     return RedirectResponse(url=f"{FRONTEND_URL}/")
