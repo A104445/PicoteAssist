@@ -51,7 +51,7 @@
             <q-item-label header>Conta</q-item-label>
 
             <!-- Espaço para futuras funcionalidades -->
-            <q-item clickable v-close-popup>
+            <q-item clickable v-close-popup @click="showSettingsModal = true">
               <q-item-section avatar>
                 <q-icon name="settings" />
               </q-item-section>
@@ -133,12 +133,58 @@
       </div>
     </q-footer>
 
+    <!-- MODAL DE DEFINIÇÕES -->
+    <q-dialog v-model="showSettingsModal">
+      <q-card style="min-width: 320px; border-radius: 16px;" class="q-pa-sm">
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6 text-weight-bold">Definições</div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+
+        <q-card-section class="q-gutter-md">
+          <!-- Opção 1: Voz do Picote -->
+          <div class="row items-center justify-between">
+            <div>
+              <div class="text-weight-medium">Voz do Picote</div>
+              <div class="text-caption text-grey">Ler respostas em voz alta</div>
+            </div>
+            <q-toggle 
+              :model-value="vozAtiva" 
+              color="primary" 
+              @update:model-value="alternarVoz" 
+            />
+          </div>
+
+          <q-separator />
+
+          <!-- Opção 2: Dark Mode -->
+          <div class="row items-center justify-between">
+            <div>
+              <div class="text-weight-medium">Modo Escuro</div>
+              <div class="text-caption text-grey">Alternar tema visual</div>
+            </div>
+            <q-toggle 
+              :model-value="darkModeAtivo" 
+              color="primary" 
+              @update:model-value="aplicarDarkMode" 
+            />
+          </div>
+        </q-card-section>
+
+        <q-card-actions align="right" class="q-pt-none">
+          <q-btn flat label="Fechar" color="primary" v-close-popup />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
   </q-layout>
 </template>
 
 <script setup>
 import { ref, nextTick, onMounted } from 'vue'
 import { marked } from 'marked'
+import { useQuasar } from 'quasar'
 
 const newMessage = ref('')
 const isLoading = ref(false)
@@ -242,6 +288,10 @@ const enviarParaOPython = async () => {
     const dados = await resposta.json()
     chatHistory.value.push({ role: 'assistant', content: dados.response })
 
+    if (vozAtiva.value) {
+      falarComOVutilizador(dados.response)
+    }
+
   } catch (erro) {
     console.error("Erro:", erro)
     chatHistory.value.push({ 
@@ -255,20 +305,85 @@ const enviarParaOPython = async () => {
   }
 }
 
+const falarComOVutilizador = (texto) => {
+  if (!('speechSynthesis' in window)) return
+
+  window.speechSynthesis.cancel()
+
+  const textoLimpo = texto
+    .replace(/[*_#`[\]()]/g, '')
+    .replace(/https?:\/\/\S+/g, 'link')
+
+  const utterance = new SpeechSynthesisUtterance(textoLimpo)
+  utterance.lang = 'pt-PT'
+  utterance.rate = 1.0
+
+  const tentarFalar = () => {
+    const voices = window.speechSynthesis.getVoices()
+    // Procura qualquer voz que seja de Portugal
+    const vozPT = voices.find(v => v.lang === 'pt-PT' || v.lang.includes('PT') || v.name.includes('Portugal'))
+    if (vozPT) {
+      utterance.voice = vozPT
+    }
+    window.speechSynthesis.speak(utterance)
+  }
+
+  // Se as vozes já estiverem carregadas, fala logo; senão espera o evento
+  const voices = window.speechSynthesis.getVoices()
+  if (voices.length > 0) {
+    tentarFalar()
+  } else {
+    window.speechSynthesis.onvoiceschanged = tentarFalar
+  }
+}
+
+const vozAtiva = ref(localStorage.getItem('vozAtiva') === 'true')
+
+const $q = useQuasar()
+
+// Estados para as Definições
+const showSettingsModal = ref(false)
+const darkModeAtivo = ref(localStorage.getItem('darkMode') === 'true')
+
+// Aplica o dark mode logo ao iniciar se estiver guardado
+if (darkModeAtivo.value) {
+  $q.dark.set(true)
+}
+
+const alternarDarkMode = () => {
+  darkModeAtivo.value = !darkModeAtivo.value
+  $q.dark.set(darkModeAtivo.value)
+  localStorage.setItem('darkMode', darkModeAtivo.value)
+}
+
 // Cria a variável da foto (tenta ler do PC primeiro)
 const userAvatar = ref(localStorage.getItem('googleAvatar') || '')
 
-// Quando a página carrega, vê se o backend lhe atirou uma foto nova
+// Função para aplicar o Dark Mode de forma segura
+const aplicarDarkMode = (isDark) => {
+  darkModeAtivo.value = isDark
+  $q.dark.set(isDark)
+  localStorage.setItem('darkMode', isDark)
+}
+
+// Função para a voz
+const alternarVoz = (val) => {
+  vozAtiva.value = val
+  localStorage.setItem('vozAtiva', val)
+}
+
+// Quando a página carrega, aplica imediatamente as preferências salvas
 onMounted(() => {
+  // 1. Aplica o Dark Mode guardado
+  const savedDark = localStorage.getItem('darkMode') === 'true'
+  aplicarDarkMode(savedDark)
+
+  // 2. Recupera o avatar da Google se vier no URL ou localStorage
   const urlParams = new URLSearchParams(window.location.search);
   const avatarUrl = urlParams.get('avatar');
-  
   if (avatarUrl) {
     userAvatar.value = avatarUrl;
-    // Guarda a foto no armazenamento do browser para sessões futuras
     localStorage.setItem('googleAvatar', avatarUrl);
-    
-    // Limpa a barra de endereços para ficar bonita (tira o ?avatar=...)
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 })
@@ -276,7 +391,7 @@ onMounted(() => {
 
 <style>
 /* =========================================
-   1. FUNDO ANIMADO (AI BLOBS)
+   1. FUNDO ANIMADO (AI BLOBS - ADAPTÁVEL)
    ========================================= */
 .ai-background {
   position: fixed;
@@ -287,17 +402,22 @@ onMounted(() => {
   z-index: -1;
   background-color: #f8f9fc;
   overflow: hidden;
+  transition: background-color 0.3s ease;
+}
+
+/* Quando o Quasar ativa o modo escuro, o body ganha a classe .body--dark */
+.body--dark .ai-background {
+  background-color: #0f1015 !important;
 }
 
 .blob {
   position: absolute;
-  filter: blur(90px); /* O truque para parecer uma nuvem difusa */
-  opacity: 0.6;
+  filter: blur(90px);
+  opacity: 0.5;
   border-radius: 50%;
   animation: float 15s infinite alternate ease-in-out;
 }
 
-/* Bolha Verde (Canto superior esquerdo) */
 .blob-1 {
   top: -10%;
   left: -10%;
@@ -307,7 +427,6 @@ onMounted(() => {
   animation-delay: 0s;
 }
 
-/* Bolha Laranja (Canto inferior direito) */
 .blob-2 {
   bottom: -15%;
   right: -10%;
@@ -317,7 +436,6 @@ onMounted(() => {
   animation-delay: -3s;
 }
 
-/* Bolha Azul Ciano (Meio/Esquerda) */
 .blob-3 {
   top: 40%;
   left: 20%;
@@ -327,12 +445,16 @@ onMounted(() => {
   animation-delay: -6s;
 }
 
+/* No modo escuro, escurecemos e suavizamos um pouco os blobs para não brilharem demasiado */
+.body--dark .blob {
+  opacity: 0.25;
+}
+
 @keyframes float {
   0% { transform: translate(0, 0) scale(1); }
   100% { transform: translate(40px, 60px) scale(1.15); }
 }
 
-/* Tornar o layout transparente para as bolhas aparecerem */
 .transparent-layout {
   background: transparent !important;
 }
@@ -345,17 +467,21 @@ onMounted(() => {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.body--dark .glass-header {
+  background: rgba(26, 28, 36, 0.75) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .glass-footer {
-  /* Retiramos a cor sólida para ver o vidro da barra */
-  background: transparent !important; 
+  background: transparent !important;
 }
 
 .input-container {
-  max-width: 750px; 
-  margin: 0 auto; 
-  /* Fundo da barra translúcido */
+  max-width: 750px;
+  margin: 0 auto;
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -363,6 +489,19 @@ onMounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
   transition: all 0.3s ease;
+}
+
+.body--dark .input-container {
+  background: rgba(26, 28, 36, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* Força a cor do texto do input no modo escuro */
+.body--dark .q-field__native, 
+.body--dark .q-field__input, 
+.body--dark .q-field__marginal {
+  color: #f3f4f6 !important;
 }
 
 /* =========================================
@@ -376,25 +515,31 @@ onMounted(() => {
   box-shadow: 0 4px 15px rgba(0,0,0,0.04);
 }
 
-.custom-chat-bubble .q-message-text:before { display: none; }
+.custom-chat-bubble .q-message-text:before { 
+  display: none; 
+}
 
-/* Balão do Utilizador (Azul Claro e Vibrante) */
+/* Balão do Utilizador (Azul vibrante em ambos os modos) */
 .bubble-user .q-message-text {
-  /* Mudámos para um azul céu que vai até ao azul clássico, sem tons escuros */
   background: linear-gradient(135deg, #4da6ff 0%, #007AFF 100%) !important;
   color: white !important;
   border-bottom-right-radius: 4px !important;
-  /* Adicionámos um brilho azulado subtil na sombra em vez de cinzento */
-  box-shadow: 0 4px 15px rgba(0, 122, 255, 0.25) !important; 
+  box-shadow: 0 4px 15px rgba(0, 122, 255, 0.25) !important;
 }
 
+/* Balão do Bot (Adapta-se ao modo escuro) */
 .bubble-bot .q-message-text {
-  /* Bot tem um balão ligeiramente translúcido para fundir com as bolhas */
   background: rgba(255, 255, 255, 0.9) !important;
   backdrop-filter: blur(5px);
   color: #2d3748 !important;
   border: 1px solid rgba(255,255,255,0.6);
   border-bottom-left-radius: 4px !important;
+}
+
+.body--dark .bubble-bot .q-message-text {
+  background: rgba(30, 32, 44, 0.9) !important;
+  color: #f3f4f6 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 @keyframes popIn {
@@ -406,35 +551,68 @@ onMounted(() => {
   animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
-.hover-effect { transition: transform 0.2s; }
-.hover-effect:hover { transform: scale(1.1); }
-html, body { scroll-behavior: smooth; }
+.hover-effect { 
+  transition: transform 0.2s; 
+}
 
-/* =========================================
-   AJUSTES PARA DISPOSITIVOS MÓVEIS (PWA)
-   ========================================= */
-   @media (max-width: 768px) {
-  /* No telemóvel, aumentamos drasticamente o tamanho em vw 
-     para compensar a falta de largura do ecrã */
+.hover-effect:hover { 
+  transform: scale(1.1); 
+}
+
+html, body { 
+  scroll-behavior: smooth; 
+}
+
+@media (max-width: 768px) {
   .blob-1 {
     top: -5%;
     left: -30%;
-    width: 130vw; 
+    width: 130vw;
     height: 130vw;
   }
-  
   .blob-2 {
     bottom: -5%;
     right: -30%;
     width: 140vw;
     height: 140vw;
   }
-  
   .blob-3 {
     top: 30%;
     left: -15%;
     width: 120vw;
     height: 120vw;
   }
+}
+
+
+/* =========================================
+   4. CORES DE TEXTO NO MODO ESCURO
+   ========================================= */
+
+/* Torna o texto do cabeçalho e títulos branco/claro no modo escuro */
+.body--dark .text-dark {
+  color: #f3f4f6 !important;
+}
+
+/* Garante que o texto dentro das mensagens do chat fica legível */
+.body--dark .message-text,
+.body--dark .q-message-text-content {
+  color: #f3f4f6 !important;
+}
+
+/* Ajusta o texto dos cabeçalhos dos menus suspensos e modais */
+.body--dark .q-item__label {
+  color: #f3f4f6 !important;
+}
+
+.body--dark .q-item__label--caption {
+  color: #9ca3af !important;
+}
+
+/* Estiliza o fundo do Modal de Definições para escuro */
+.body--dark .q-card {
+  background-color: #1a1c24 !important;
+  color: #f3f4f6 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 </style>
