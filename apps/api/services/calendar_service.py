@@ -5,23 +5,23 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
 def get_calendar_service():
-    """Autentica na Google Calendar API usando o Refresh Token."""
-    client_id = os.environ.get("GOOGLE_CLIENT_ID")
-    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
-    refresh_token = os.environ.get("GOOGLE_REFRESH_TOKEN")
-
-    creds = Credentials(
-        token=None,
-        refresh_token=refresh_token,
-        token_uri="https://oauth2.googleapis.com/token",
-        client_id=client_id,
-        client_secret=client_secret,
-        scopes=["https://www.googleapis.com/auth/calendar"]
-    )
+    """Autentica na Google Calendar API lendo o ficheiro token.json."""
+    SCOPES = [
+            'https://www.googleapis.com/auth/calendar', 
+            'https://www.googleapis.com/auth/tasks',
+            'https://www.googleapis.com/auth/userinfo.profile'
+        ]    
+    if os.path.exists('token.json'):
+        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+    else:
+        raise Exception("Token não encontrado. Clica no botão 'Conectar Google' primeiro.")
 
     if not creds.valid:
-        creds.refresh(Request())
-
+        if creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+            with open('token.json', 'w') as token_file:
+                token_file.write(creds.to_json())
+                
     return build("calendar", "v3", credentials=creds)
 
 def create_calendar_event(title: str, start_time: str, end_time: str, description: str = "", todo_o_dia: bool = False) -> str:

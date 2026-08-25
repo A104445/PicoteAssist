@@ -23,7 +23,49 @@
           </span>
         </div>
         <q-space />
-        <q-btn flat round dense icon="more_horiz" color="grey-7" />
+        <q-btn-dropdown flat round dense class="q-mr-sm">
+          
+          <!-- O "rótulo" do botão que muda dinamicamente -->
+          <template v-slot:label>
+            <q-avatar size="32px">
+              <img v-if="userAvatar" :src="userAvatar" referrerpolicy="no-referrer" />
+              <q-icon v-else name="account_circle" size="32px" color="grey-7" />
+            </q-avatar>
+          </template>
+          <q-list style="min-width: 200px">
+            
+            <q-item-label header>Integrações</q-item-label>
+            
+            <q-item clickable v-close-popup @click="conectarGoogle">
+              <q-item-section avatar>
+                <q-icon name="event" color="primary" />
+              </q-item-section>
+              <q-item-section>
+                <q-item-label>Conectar Google</q-item-label>
+                <q-item-label caption>Sincronizar Calendário</q-item-label>
+              </q-item-section>
+            </q-item>
+
+            <q-separator />
+            
+            <q-item-label header>Conta</q-item-label>
+
+            <!-- Espaço para futuras funcionalidades -->
+            <q-item clickable v-close-popup>
+              <q-item-section avatar>
+                <q-icon name="settings" />
+              </q-item-section>
+              <q-item-section>Definições</q-item-section>
+            </q-item>
+            
+            <q-item clickable v-close-popup @click="fazerLogout">
+              <q-item-section avatar>
+                <q-icon name="logout" color="negative" />
+              </q-item-section>
+              <q-item-section>Sair</q-item-section>
+            </q-item>
+          </q-list>
+        </q-btn-dropdown>
       </q-toolbar>
     </q-header>
 
@@ -95,13 +137,23 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, onMounted } from 'vue'
 import { marked } from 'marked'
 
 const newMessage = ref('')
 const isLoading = ref(false)
 
 const isListening = ref(false)
+
+const conectarGoogle = () => {
+  // Ajusta a porta caso o teu FastAPI local não esteja na 8000
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+  window.location.href = `${backendUrl}/api/google/login`;
+};
+
+const fazerLogout = () => {
+  console.log("Logout clicado! Futura ligação ao Supabase.");
+};
 
 const startVoiceRecognition = () => {
   // Verifica se o browser suporta reconhecimento de voz
@@ -172,16 +224,18 @@ const enviarParaOPython = async () => {
       text: msg.content // O Python está à procura da chave 'text'
     }))
 
-  try {
-    // const resposta = await fetch('https://picote-assist-api.onrender.com/api/chat'
-    const resposta = await fetch('http://localhost:8000/api/chat', { // Usa o teu link real do Render aqui
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        message: texto, 
-        history: historicoParaEnviar // <-- 3. Enviamos a memória para o backend!
+    try {
+      // Vai buscar o URL base (localhost no teu PC, ou o URL do Vercel na nuvem)
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+      
+      const resposta = await fetch(`${backendUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+           message: texto,
+           history: historicoParaEnviar 
+        })
       })
-    })
 
     if (!resposta.ok) throw new Error('Erro do servidor Python')
     
@@ -200,6 +254,24 @@ const enviarParaOPython = async () => {
     window.scrollTo(0, document.body.scrollHeight)
   }
 }
+
+// Cria a variável da foto (tenta ler do PC primeiro)
+const userAvatar = ref(localStorage.getItem('googleAvatar') || '')
+
+// Quando a página carrega, vê se o backend lhe atirou uma foto nova
+onMounted(() => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const avatarUrl = urlParams.get('avatar');
+  
+  if (avatarUrl) {
+    userAvatar.value = avatarUrl;
+    // Guarda a foto no armazenamento do browser para sessões futuras
+    localStorage.setItem('googleAvatar', avatarUrl);
+    
+    // Limpa a barra de endereços para ficar bonita (tira o ?avatar=...)
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+})
 </script>
 
 <style>

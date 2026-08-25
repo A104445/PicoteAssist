@@ -4,6 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import datetime
+from fastapi import Request
+from fastapi.responses import RedirectResponse
+from google_auth_oauthlib.flow import Flow
+import requests
 
 # Forçar a procura do .env na pasta raiz ou na pasta atual
 load_dotenv(dotenv_path="../../.env") # Tenta ler da raiz
@@ -35,6 +39,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- CONFIGURAÇÕES GOOGLE OAUTH ---
+SCOPES = [
+    'https://www.googleapis.com/auth/calendar',
+    'https://www.googleapis.com/auth/tasks',
+    'https://www.googleapis.com/auth/userinfo.profile'
+]
+CLIENT_SECRETS_FILE = "credentials.json"
+
+# Vai buscar o URL da Nuvem. Se não existir no .env, assume o localhost para testares no PC.
+BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+# ----------------------------------
 
 # Inicializa o cliente Gemini
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
@@ -185,3 +204,66 @@ async def chat_endpoint(req: ChatRequest):
     except Exception as e:
         print(f"Erro na API: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+# Guarda o estado de segurança entre o login e o callback
+oauth_state = {}
+
+@app.get("/api/google/login")
+def login_google():
+    flow = Flow.from_client_secrets_file(
+        CLIENT_SECRETS_FILE,
+        scopes=SCOPES,
+        redirect_uri=f'{BACKEND_URL}/api/google/callback' 
+    )
+    
+    # A Google agora exige que guardemos o "state" e o "code_verifier" (PKCE)
+    auth_url, state = flow.authorization_url(prompt='consent', access_type='offline')
+    
+    # Guardamos os dados de segurança na nossa variável de memória
+    oauth_state['state'] = state
+    oauth_state['code_verifier'] = flow.code_verifier
+    
+    return RedirectResponse(auth_url)
+
+
+@app.get("/api/google/callback")
+def google_callback(request: Request):
+    # Lemos o state que a Google enviou de volta no link
+    state = request.query_params.get("state")
+    
+    flow = Flow.from_client_secrets_file(
+        CLIENT_SECRETS_FILE,
+        scopes=SCOPES,
+        state=state,  # Passamos o state para validar a segurança
+        redirect_uri=f'{BACKEND_URL}/api/google/callback'
+    )
+    
+    # Injetamos o "código secreto" original que guardámos no login
+    flow.code_verifier = oauth_state.get('code_verifier')
+    
+    # O Render/Vercel usam HTTPS, forçamos essa conversão por segurança
+    authorization_response = str(request.url).replace("http://", "https://") if "localhost" not in BACKEND_URL else str(request.url)
+    
+    # Agora sim, a Google vai aceitar o pedido!
+    flow.fetch_token(authorization_response=authorization_response) 
+    credentials = flow.credentials
+    
+    with open('token.json', 'w') as token_file:
+        token_file.write(credentials.to_json())
+        
+    try:
+        # Pede à Google a foto de perfil usando a chave que acabámos de gerar
+        resposta_perfil = requests.get(
+            "https://www.googleapis.com/oauth2/v1/userinfo?alt=json",
+            headers={"Authorization": f"Bearer {credentials.token}"}
+        )
+        foto_url = resposta_perfil.json().get("picture", "")
+    except Exception as e:
+        print(f"Erro ao buscar foto: {e}")
+        foto_url = ""
+        
+    print("-> TOKEN E FOTO GUARDADOS COM SUCESSO!")
+    
+    # Redireciona de volta para o teu Vue, passando o link da foto escondido no URL
+    url_destino = f"{FRONTEND_URL}?avatar={foto_url}" if foto_url else FRONTEND_URL
+    return RedirectResponse(url_destino)
