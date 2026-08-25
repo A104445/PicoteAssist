@@ -241,12 +241,13 @@ def login_google():
 
 @app.get("/api/google/callback")
 def google_callback(request: Request, code: str = None, state: str = None):
+    # (A parte do teu código que cria o flow e faz o fetch_token continua igual)
     if os.path.exists(CLIENT_SECRETS_FILE):
         flow = Flow.from_client_secrets_file(
             CLIENT_SECRETS_FILE,
             scopes=SCOPES,
             redirect_uri=f'{BACKEND_URL}/api/google/callback',
-            autogenerate_code_verifier=False  # <-- Desativa o PKCE problemático
+            autogenerate_code_verifier=False
         )
     else:
         client_config = {
@@ -262,13 +263,22 @@ def google_callback(request: Request, code: str = None, state: str = None):
             client_config,
             scopes=SCOPES,
             redirect_uri=f'{BACKEND_URL}/api/google/callback',
-            autogenerate_code_verifier=False  # <-- Desativa o PKCE problemático
+            autogenerate_code_verifier=False
         )
 
     flow.fetch_token(code=code)
     creds = flow.credentials
     
+    # Guarda o token no ficheiro token.json
     with open(TOKEN_FILE, 'w') as token:
         token.write(creds.to_json())
         
-    return RedirectResponse(url=f"{FRONTEND_URL}/")
+    # === ADICIONA ESTAS LINHAS AQUI ===
+    from googleapiclient.discovery import build
+    service = build('oauth2', 'v2', credentials=creds)
+    user_info = service.userinfo().get().execute()
+    picture_url = user_info.get('picture', '')
+    # ==================================
+
+    # Redireciona para o Vercel enviando a foto no parâmetro do URL
+    return RedirectResponse(url=f"{FRONTEND_URL}/?avatar={picture_url}")
