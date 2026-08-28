@@ -24,76 +24,60 @@ def get_tasks_service():
     return build("tasks", "v1", credentials=creds)
 
 def ler_tarefas() -> str:
-    """
-    Lê as tarefas pendentes da lista principal do Google Tasks.
-    Filtra e oculta automaticamente as que contêm a etiqueta '[NOTA]'.
-    """
+    """Lê as tarefas pendentes gerais, ocultando todas as categorias especiais."""
     try:
         service = get_tasks_service()
-        # showCompleted=False para não trazer as tarefas já concluídas
         resultados = service.tasks().list(tasklist='@default', showCompleted=False).execute()
         tarefas = resultados.get('items', [])
         
         if not tarefas:
-            return "A tua lista de tarefas está vazia. Tudo limpo!"
+            return "A tua lista de tarefas está vazia."
             
-        texto_resposta = "Aqui estão as tuas tarefas pendentes:\n"
+        texto_resposta = "Aqui estão as tuas tarefas pendentes (gerais):\n"
         tarefas_encontradas = 0
         
+        # Oculta qualquer tarefa que tenha uma destas etiquetas
+        etiquetas_ocultas = ['[nota]', '[compra]', '[projeto]', '[media]', '[ideia]', '[rotina]']
+        
         for tarefa in tarefas:
-            titulo = tarefa.get('title', '')
-            # Apenas adiciona à resposta se não for uma nota
-            if '[nota]' not in titulo.lower():
-                texto_resposta += f"- {titulo}\n"
+            titulo = tarefa.get('title', '').lower()
+            if not any(etiqueta in titulo for etiqueta in etiquetas_ocultas):
+                texto_resposta += f"- {tarefa.get('title', '')}\n"
                 tarefas_encontradas += 1
                 
         if tarefas_encontradas == 0:
-            return "Não tens tarefas pendentes na lista (apenas notas guardadas)."
+            return "Não tens tarefas gerais pendentes (apenas notas e listas organizadas)."
             
         return texto_resposta
     except Exception as e:
-        print("------- ERRO AO LER TAREFAS -------")
-        print(e)
-        print("-----------------------------------")
         return f"Erro técnico ao aceder às tarefas: {str(e)}"
-    
-def ler_notas() -> str:
+
+def consultar_lista_especifica(categoria: str) -> str:
     """
-    Lê todas as notas guardadas (tarefas que contêm a etiqueta '[NOTA]').
-    Mostra o título da nota e o seu conteúdo (descrição).
+    Lê tarefas que contêm uma etiqueta específica (ex: '[COMPRA]', '[PROJETO]', '[MEDIA]', '[IDEIA]', '[NOTA]').
     """
     try:
         service = get_tasks_service()
-        # showCompleted=False para mostrar apenas as notas ativas
         resultados = service.tasks().list(tasklist='@default', showCompleted=False).execute()
         tarefas = resultados.get('items', [])
         
-        texto_resposta = "Aqui estão as tuas notas guardadas:\n\n"
-        notas_encontradas = 0
+        texto_resposta = f"Aqui estão os teus registos para a categoria {categoria}:\n\n"
+        encontrados = 0
         
         for tarefa in tarefas:
             titulo = tarefa.get('title', '')
-            
-            # Filtra APENAS as que têm [nota] no título
-            if '[nota]' in titulo.lower():
-                notas_encontradas += 1
+            if categoria.lower() in titulo.lower():
+                encontrados += 1
                 descricao = tarefa.get('notes', 'Sem conteúdo.')
+                titulo_limpo = titulo.lower().replace(categoria.lower(), '').strip().title()
+                texto_resposta += f"• {titulo_limpo}\n  Detalhes: {descricao}\n\n"
                 
-                # Limpa o prefixo [NOTA] para ficar mais bonito na leitura
-                titulo_limpo = titulo.lower().replace('[nota]', '').strip().title()
-                
-                texto_resposta += f"📌 {titulo_limpo}\nConteúdo: {descricao}\n\n"
-                
-        if notas_encontradas == 0:
-            return "Não tens nenhuma nota guardada neste momento."
+        if encontrados == 0:
+            return f"Não tens nenhum registo com a etiqueta {categoria} neste momento."
             
         return texto_resposta
-        
     except Exception as e:
-        print("------- ERRO AO LER NOTAS -------")
-        print(e)
-        print("---------------------------------")
-        return f"Erro técnico ao aceder às notas: {str(e)}"
+        return f"Erro ao consultar a categoria {categoria}: {str(e)}"
 
 def criar_tarefa(titulo: str, notas: str = None) -> str:
     """
@@ -247,26 +231,35 @@ def apagar_tarefa(nome_tarefa: str) -> str:
     
 def limpar_tarefas_concluidas() -> str:
     """
-    Limpa a lista manualmente: procura todas as tarefas concluídas e apaga-as uma a uma.
+    Limpa a lista manualmente: procura tarefas concluídas e apaga-as uma a uma, 
+    EXCETO as que estão marcadas como [ROTINA].
     """
     try:
-        print("\n[DEBUG] 🕵️ O PICOTE VAI ASPIRAR AS TAREFAS CONCLUÍDAS MANUALMENTE")
+        print("\n[DEBUG] O PICOTE VAI ASPIRAR AS TAREFAS CONCLUÍDAS (IGNORANDO ROTINAS)")
         
         service = get_tasks_service()
         
-        # O showHidden=True é obrigatório para a Google nos devolver as tarefas já riscadas
+        # showHidden=True é obrigatório para a Google nos devolver as tarefas já riscadas
         resultados = service.tasks().list(tasklist='@default', showHidden=True).execute()
         tarefas = resultados.get('items', [])
         
         tarefas_apagadas = 0
+        rotinas_poupadas = 0
         
         for tarefa in tarefas:
             # Verifica se o estado da tarefa é 'completed' (concluída)
             if tarefa.get('status') == 'completed':
                 titulo = tarefa.get('title', 'Sem título')
-                print(f"[DEBUG] 🧹 A apagar definitivamente: {titulo}")
                 
-                # Apaga a tarefa específica
+                # === PROTEÇÃO DAS ROTINAS ===
+                if '[rotina]' in titulo.lower():
+                    print(f"[DEBUG] Rotina protegida (não apagada): {titulo}")
+                    rotinas_poupadas += 1
+                    continue # Salta para a próxima tarefa sem apagar esta
+                    
+                print(f"[DEBUG] A apagar definitivamente: {titulo}")
+                
+                # Apaga a tarefa comum
                 service.tasks().delete(
                     tasklist='@default', 
                     task=tarefa['id']
@@ -275,12 +268,39 @@ def limpar_tarefas_concluidas() -> str:
                 tarefas_apagadas += 1
                 
         if tarefas_apagadas == 0:
-            print("[DEBUG] 🤷 Não encontrei nenhuma tarefa com o estado 'completed'")
-            return "Não encontrei nenhuma tarefa marcada como concluída para apagar."
+            return f"Não encontrei nenhuma tarefa comum marcada como concluída para apagar. (Rotinas concluídas mantidas: {rotinas_poupadas})"
             
-        return f"Limpeza feita com sucesso! Apaguei definitivamente {tarefas_apagadas} tarefas concluídas."
+        return f"Limpeza feita com sucesso! Apaguei definitivamente {tarefas_apagadas} tarefas concluídas. (Protegi {rotinas_poupadas} rotinas)."
         
     except Exception as e:
         print("------- ERRO AO LIMPAR TAREFAS CONCLUÍDAS -------")
         print(e)
         return f"Erro técnico ao limpar as tarefas concluídas: {str(e)}"
+    
+def reiniciar_rotinas() -> str:
+    """Procura todas as tarefas com '[ROTINA]' concluídas e volta a marcá-las como pendentes para o novo dia."""
+    try:
+        service = get_tasks_service()
+        # showHidden=True é obrigatório para a API ver tarefas que já foram concluídas e ocultadas
+        resultados = service.tasks().list(tasklist='@default', showHidden=True).execute()
+        tarefas = resultados.get('items', [])
+        
+        rotinas_reiniciadas = 0
+        
+        for tarefa in tarefas:
+            titulo = tarefa.get('title', '').lower()
+            if '[rotina]' in titulo and tarefa.get('status') == 'completed':
+                # Desmarca a tarefa no Google Tasks
+                service.tasks().patch(
+                    tasklist='@default', 
+                    task=tarefa['id'], 
+                    body={'status': 'needsAction'}
+                ).execute()
+                rotinas_reiniciadas += 1
+                
+        if rotinas_reiniciadas == 0:
+            return "Nenhuma rotina precisava de ser reiniciada hoje."
+            
+        return f"Feito! {rotinas_reiniciadas} rotinas diárias foram desmarcadas e estão prontas para hoje."
+    except Exception as e:
+        return f"Erro ao reiniciar rotinas: {str(e)}"

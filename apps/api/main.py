@@ -25,7 +25,7 @@ from services.supabase_service import (
 )
 from services.calendar_service import create_calendar_event, list_calendar_events, apagar_evento_calendario, editar_evento_calendario, criar_evento_recorrente
 
-from services.tasks_service import ler_tarefas, ler_notas, criar_tarefa, editar_tarefa, concluir_tarefa, apagar_tarefa, limpar_tarefas_concluidas
+from services.tasks_service import ler_tarefas, consultar_lista_especifica, criar_tarefa, editar_tarefa, concluir_tarefa, apagar_tarefa, limpar_tarefas_concluidas, reiniciar_rotinas
 
 app = FastAPI(title="Picote Assist API")
 
@@ -66,12 +66,13 @@ assistant_tools = [
     editar_evento_calendario, 
     criar_evento_recorrente,
     ler_tarefas,
-    ler_notas,
+    consultar_lista_especifica,
     criar_tarefa,
     editar_tarefa,
     concluir_tarefa,
     apagar_tarefa,
     limpar_tarefas_concluidas,
+    reiniciar_rotinas,
     add_task,
     list_tasks,
     add_note,
@@ -89,19 +90,6 @@ async def chat_endpoint(req: ChatRequest):
     try:
         data_atual = datetime.datetime.now().strftime("%d de %B de %Y")
         hora_atual = datetime.datetime.now().strftime("%H:%M")
-
-        # system_instruction = f"""És o Picote Assist, o meu assistente pessoal.
-        # INFORMAÇÃO IMPORTANTE: Hoje é dia {data_atual} e são {hora_atual}. Usa sempre esta data como referência para 'hoje', 'amanhã', 'próxima semana', etc.
-        # Regras de atuação:
-        # 1. Invoca SEMPRE a ferramenta correspondente quando o utilizador pedir para registar, consultar ou agendar algo.
-        # 2. Mantém as tuas respostas finais concisas, amigáveis e focadas na confirmação do que foi feito.
-        # 3. Para movimentos financeiros: valores positivos são faturação/receitas e negativos são despesas/gastos.
-        # Atenção: Ao criares eventos no calendário, usa sempre a hora local de Portugal. Nunca adiciones a letra 'Z' no final da string de data/hora.
-        # Regra para Notas: Sempre que eu te pedir para guardar uma nota, ideia ou apontamento, usa a ferramenta criar_tarefa com o prefixo '[NOTA]' no título e guarda o conteúdo no campo das notas.
-        # Se eu quiser saber quais são as minhas tarefas pendentes, usa a ferramenta ler_tarefas.
-        # Se eu quiser ler, consultar ou saber quais são as minhas notas guardadas, usa a ferramenta ler_notas.
-        # Se eu te pedir para limpar ou apagar as tarefas concluídas/terminadas, usa a ferramenta limpar_tarefas_concluidas.
-        # """
         
         system_instruction = f"""És o Picote Assist, o meu assistente pessoal e de inteligência artificial.
         INFORMAÇÃO IMPORTANTE: Hoje é dia {data_atual} e são {hora_atual}. Usa sempre esta data como referência.
@@ -112,8 +100,18 @@ async def chat_endpoint(req: ChatRequest):
         - Invoca SEMPRE a ferramenta correspondente quando eu pedir para registar, consultar ou agendar algo.
         - Mantém as tuas respostas concisas e foca-te na confirmação do que foi feito.
         - Para movimentos financeiros: valores positivos são receitas, negativos são despesas.
-        - Ao criares eventos no calendário, usa a hora local de Portugal. Nunca adiciones a letra 'Z' no final.
-        - Regra para Notas: Usa a ferramenta criar_tarefa com o prefixo '[NOTA]' no título e guarda o conteúdo nas notas.
+        - Ao criares eventos no calendário, usa a hora local de Portugal. Nunca adiciones a letra 'Z' no final.        
+        - MODO ORGANIZAÇÃO DE LISTAS (TASKS):
+            Sempre que eu te pedir para guardar algo, usa a ferramenta criar_tarefa com o prefixo OBRIGATÓRIO no título e guarda os detalhes nas notas:
+            1. [COMPRA]: Para produtos de supermercado, compras online ou software.
+            2. [PROJETO]: Para tarefas da universidade, código, bugs ou teses.
+            3. [MEDIA]: Para filmes, séries, livros ou artigos que eu queira consumir.
+            4. [IDEIA]: Para brainstorming e pensamentos para o futuro.
+            5. [NOTA]: Para factos ou apontamentos gerais.
+            6. [ROTINA]: Para hábitos diários e tarefas repetitivas (ex: vitaminas, água, limpezas).
+            
+            Para consultares estas listas, usa SEMPRE a ferramenta consultar_lista_especifica com o argumento da categoria exata (ex: categoria='[COMPRA]').
+            Para leres as tarefas normais do dia a dia, usa a ferramenta ler_tarefas.
         - MODO FECHO DO DIA (VOU DORMIR / BOA NOITE):
             Quando eu disser "Vou dormir" ou "Boa noite":
             1. Usa list_calendar_events para leres todos os eventos do dia de hoje.
@@ -127,10 +125,12 @@ async def chat_endpoint(req: ChatRequest):
             5. Despede-te com o balanço diário e deseja-me uma boa noite.
         - MODO ARRANQUE DO DIA (ACORDEI / BOM DIA):
             Quando eu disser "Bom dia" ou "Acordei":
-            1. Usa editar_evento_calendario para encontrares o evento "Dormir" da noite anterior e altera apenas a `nova_hora_fim` (e data, se passou da meia-noite) para a hora exata atual.
-            2. Usa list_calendar_events para leres a minha agenda para hoje.
-            3. Usa ler_tarefas para leres as minhas pendências.
-            4. Dá-me os bons dias de forma enérgica e faz-me um resumo amigável do dia, cruzando as tarefas com os meus tempos livres.
+            1. Usa a ferramenta reiniciar_rotinas OBRIGATORIAMENTE para preparar os meus hábitos de hoje.
+            2. Usa editar_evento_calendario para encontrares o evento "Dormir" da noite anterior e altera a hora de fim para agora.
+            3. Usa list_calendar_events para leres a minha agenda de hoje.
+            4. Usa ler_tarefas para leres as minhas pendências gerais.
+            5. Usa consultar_lista_especifica com o argumento categoria='[ROTINA]' para veres os hábitos que tenho de cumprir hoje.
+            6. Dá-me os bons dias de forma enérgica e faz um resumo do dia cruzando a minha agenda, pendências e rotinas.
             
         2. MODO IA CONVERSACIONAL E CONSULTOR:
         - Quando eu te fizer perguntas de cultura geral, pedir ajuda com textos, explicações, ou simplesmente conversar, liberta-te das regras de produtividade.

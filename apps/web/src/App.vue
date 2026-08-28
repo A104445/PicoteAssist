@@ -239,8 +239,26 @@ const startVoiceRecognition = () => {
   recognition.start()
 }
 
+// 1. Cria uma lista com várias mensagens de boas-vindas
+const mensagensIniciais = [
+  "Olá! Sou o Picote. O que vamos organizar hoje?",
+  "Boas! Diz-me o que precisas de anotar, agendar ou simplesmente resolver.",
+  "Estou por aqui. Qual é a prioridade número um para hoje?",
+  "Olá! Pronto para ajudar a pôr as ideias em ordem. O que manda?",
+  "Tudo operacional. Que tarefas, lembretes ou eventos queres registar agora?",
+  "Boas! Estou a postos. Diz-me o que tens em mente para arrancar.",
+  "Sempre às ordens! O que queres despachar primeiro hoje?",
+  "Olá. Estou pronto para te ajudar a limpar essa lista de afazeres.",
+  "Boas! Que parte da tua semana queres que eu ajude a planear?",
+  "Estou ligado e pronto a ajudar. Manda vir o que precisares."
+]
+
+// 2. Escolhe uma mensagem aleatória
+const saudacaoAleatoria = mensagensIniciais[Math.floor(Math.random() * mensagensIniciais.length)]
+
+// 3. Inicializa o histórico com a mensagem escolhida
 const chatHistory = ref([
-  { role: 'assistant', content: 'Olá! Sou o Picote. Em que te posso ajudar hoje?' }
+  { role: 'assistant', content: saudacaoAleatoria }
 ])
 
 const formatText = (text) => {
