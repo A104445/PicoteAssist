@@ -2,25 +2,22 @@ import os
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
+from state import current_google_token 
 
 def get_tasks_service():
-    """Autentica na Google Tasks API lendo o ficheiro token.json."""
-    SCOPES = [
-            'https://www.googleapis.com/auth/calendar', 
-            'https://www.googleapis.com/auth/tasks',
-            'https://www.googleapis.com/auth/userinfo.profile'
-        ]    
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-    else:
-        raise Exception("Token não encontrado. Clica no botão 'Conectar Google' primeiro.")
-
-    if not creds.valid:
-        if creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-            with open('token.json', 'w') as token_file:
-                token_file.write(creds.to_json())
-                
+    # Vai buscar o token que o main.py guardou no state
+    token_do_user = current_google_token.get()
+    
+    if not token_do_user:
+        raise Exception("Autenticação necessária.")
+        
+    creds = Credentials(
+        token=None,
+        refresh_token=token_do_user,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=os.environ.get("GOOGLE_CLIENT_ID"),
+        client_secret=os.environ.get("GOOGLE_CLIENT_SECRET")
+    )
     return build("tasks", "v1", credentials=creds)
 
 def ler_tarefas() -> str:

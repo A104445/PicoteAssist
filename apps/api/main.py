@@ -8,6 +8,8 @@ from fastapi import Request
 from fastapi.responses import RedirectResponse
 from google_auth_oauthlib.flow import Flow
 import requests
+from zoneinfo import ZoneInfo
+from state import current_google_token
 
 # Forçar a procura do .env na pasta raiz ou na pasta atual
 load_dotenv(dotenv_path="../../.env") # Tenta ler da raiz
@@ -84,12 +86,16 @@ assistant_tools = [
 class ChatRequest(BaseModel):
     message: str
     history: list = []
+    token: str = None
 
 @app.post("/api/chat")
 async def chat_endpoint(req: ChatRequest):
+    if req.token:
+        current_google_token.set(req.token)
     try:
-        data_atual = datetime.datetime.now().strftime("%d de %B de %Y")
-        hora_atual = datetime.datetime.now().strftime("%H:%M")
+        fuso_horario = ZoneInfo("Europe/Lisbon")
+        data_atual = datetime.datetime.now(fuso_horario).strftime("%d de %B de %Y")
+        hora_atual = datetime.datetime.now(fuso_horario).strftime("%H:%M")
         
         system_instruction = f"""És o Picote Assist, o meu assistente pessoal e de inteligência artificial.
         INFORMAÇÃO IMPORTANTE: Hoje é dia {data_atual} e são {hora_atual}. Usa sempre esta data como referência.
@@ -280,5 +286,8 @@ def google_callback(request: Request, code: str = None, state: str = None):
     picture_url = user_info.get('picture', '')
     # ==================================
 
-    # Redireciona para o Vercel enviando a foto no parâmetro do URL
-    return RedirectResponse(url=f"{FRONTEND_URL}/?avatar={picture_url}")
+    # 1. Pega no Refresh Token vitalício
+    refresh_token = creds.refresh_token
+    
+    # 2. Envia para o Vercel pelo URL (junto com o avatar que já lá tinhas)
+    return RedirectResponse(url=f"{FRONTEND_URL}/?avatar={picture_url}&token={refresh_token}")

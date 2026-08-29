@@ -292,12 +292,16 @@ const enviarParaOPython = async () => {
       // Vai buscar o URL base (localhost no teu PC, ou o URL do Vercel na nuvem)
       const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
       
+      // Vai buscar o token que guardaste no browser
+      const tokenDoUtilizador = localStorage.getItem('google_refresh_token')
+
       const resposta = await fetch(`${backendUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-           message: texto,
-           history: historicoParaEnviar 
+        body: JSON.stringify({
+            message: texto,
+            history: historicoParaEnviar,
+            token: tokenDoUtilizador // <-- FALTAVA ESTA LINHA OBRIGATÓRIA
         })
       })
 
@@ -390,18 +394,33 @@ const alternarVoz = (val) => {
   localStorage.setItem('vozAtiva', val)
 }
 
-// Quando a página carrega, aplica imediatamente as preferências salvas
 onMounted(() => {
   // 1. Aplica o Dark Mode guardado
   const savedDark = localStorage.getItem('darkMode') === 'true'
   aplicarDarkMode(savedDark)
 
-  // 2. Recupera o avatar da Google se vier no URL ou localStorage
+  // 2. Lê os parâmetros que vêm no URL
   const urlParams = new URLSearchParams(window.location.search);
   const avatarUrl = urlParams.get('avatar');
+  const token = urlParams.get('token');
+  
+  let precisaLimparUrl = false;
+
+  // 3. Guarda a foto
   if (avatarUrl) {
     userAvatar.value = avatarUrl;
     localStorage.setItem('googleAvatar', avatarUrl);
+    precisaLimparUrl = true;
+  }
+
+  // 4. Guarda o token de acesso vitalício
+  if (token) {
+    localStorage.setItem('google_refresh_token', token);
+    precisaLimparUrl = true;
+  }
+
+  // 5. Limpa a barra de endereço para ficar elegante
+  if (precisaLimparUrl) {
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 })

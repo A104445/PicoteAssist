@@ -3,25 +3,26 @@ import os
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
+from state import current_google_token
 
 def get_calendar_service():
-    """Autentica na Google Calendar API lendo o ficheiro token.json."""
-    SCOPES = [
-            'https://www.googleapis.com/auth/calendar', 
-            'https://www.googleapis.com/auth/tasks',
-            'https://www.googleapis.com/auth/userinfo.profile'
-        ]    
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-    else:
-        raise Exception("Token não encontrado. Clica no botão 'Conectar Google' primeiro.")
-
-    if not creds.valid:
-        if creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-            with open('token.json', 'w') as token_file:
-                token_file.write(creds.to_json())
-                
+    """Autentica na Google Calendar API usando o token em memória (Stateless)."""
+    # 1. Vai buscar o token do utilizador isolado neste pedido
+    token_do_user = current_google_token.get()
+    
+    if not token_do_user:
+        raise Exception("Autenticação necessária. Clica no botão 'Conectar Google' primeiro.")
+        
+    # 2. Constrói as credenciais diretamente a partir do .env e do token recebido
+    creds = Credentials(
+        token=None,
+        refresh_token=token_do_user,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=os.environ.get("GOOGLE_CLIENT_ID"),
+        client_secret=os.environ.get("GOOGLE_CLIENT_SECRET")
+    )
+    
+    # 3. Devolve o serviço construído para o calendário
     return build("calendar", "v3", credentials=creds)
 
 def create_calendar_event(title: str, start_time: str, end_time: str, description: str = "", todo_o_dia: bool = False) -> str:
