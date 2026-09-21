@@ -291,3 +291,46 @@ def google_callback(request: Request, code: str = None, state: str = None):
     
     # 2. Envia para o Vercel pelo URL (junto com o avatar que já lá tinhas)
     return RedirectResponse(url=f"{FRONTEND_URL}/?avatar={picture_url}&token={refresh_token}")
+
+class MealCheckRequest(BaseModel):
+    meal_name: str
+    token: str | None = None
+
+@app.post("/api/check_meal")
+async def check_meal_endpoint(req: MealCheckRequest):
+    if req.token:
+        current_google_token.set(req.token)
+    
+    try:
+        from services.calendar_service import get_calendar_service
+        service = get_calendar_service()
+        
+        # Pega no início e fim do dia atual
+        hoje = datetime.datetime.now(ZoneInfo("Europe/Lisbon"))
+        inicio_dia = hoje.replace(hour=0, minute=0, second=0).isoformat()
+        fim_dia = hoje.replace(hour=23, minute=59, second=59).isoformat()
+        
+        # # O Google Calendar exige o Z no final para o UTC
+        # if not inicio_dia.endswith('Z'): inicio_dia += 'Z'
+        # if not fim_dia.endswith('Z'): fim_dia += 'Z'
+        
+        events_result = service.events().list(
+            calendarId='primary', 
+            timeMin=inicio_dia,
+            timeMax=fim_dia,
+            singleEvents=True
+        ).execute()
+        
+        eventos = events_result.get('items', [])
+        registado = False
+        
+        # Verifica se o nome da refeição (ex: "Almoço") está no título do evento
+        for e in eventos:
+            if req.meal_name.lower() in e.get('summary', '').lower():
+                registado = True
+                break
+                
+        return {"registered": registado}
+    except Exception as e:
+        print(f"Erro ao verificar refeição: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

@@ -394,6 +394,135 @@ const alternarVoz = (val) => {
   localStorage.setItem('vozAtiva', val)
 }
 
+const frasesMotivacionais = [
+  "Ninguém vai escrever esse código por ti. Senta-te e programa.",
+  "A consistência no treino constrói-se naqueles dias em que não te apetece ir.",
+  "Um por cento melhor todos os dias. O esforço e os pequenos hábitos acumulam.",
+  "O cansaço é temporário. O mestrado é para sempre.",
+  "Foca-te. A tua tese não se vai simular sozinha em C++.",
+  "Eles duvidam? Deixa o teu trabalho falar mais alto no campo e no terminal.",
+  "A disciplina pesa onças, o arrependimento pesa toneladas.",
+  "Não esperes pela motivação. Age e ela aparece no processo.",
+  "O erro de compilação de hoje é a robustez do sistema de amanhã.",
+  "Levanta o peso, bate a meta, repete.",
+  "Estudar Engenharia Informática não é para quem desiste ao primeiro bug.",
+  "O sucesso aluga-se e a renda paga-se todos os dias.",
+  "Falhar faz parte. Até no futebol, só não erra quem não joga.",
+  "Se fosse fácil, todos fariam. Destaca-te da média.",
+  "O teu foco determina a tua realidade. Desliga as distrações e foca-te.",
+  "Ninguém vê as horas perdidas no Linux, só vêem o deploy feito no Vercel.",
+  "Mais uma repetição. É aí que o músculo rasga e cresce.",
+  "A tua mente vai desistir antes do teu corpo. Ignora a mente e continua.",
+  "Controla os teus impulsos instintivos, ou eles vão controlar-te a ti.",
+  "O talento perde para o trabalho duro quando o talento não quer trabalhar.",
+  "O tempo vai passar de qualquer maneira. Faz com que estas horas valham a pena.",
+  "Um verdadeiro engenheiro encontra soluções invisíveis onde os outros só vêem problemas.",
+  "Não pares quando estiveres cansado, pára apenas quando tiveres terminado.",
+  "A dor do arrependimento é infinitamente pior que a dor da disciplina.",
+  "A tua versão do futuro está a observar-te neste exato momento. Não o desiludas.",
+  "Foca-te no processo diário. O resultado final será apenas uma consequência natural.",
+  "Hoje é o dia perfeito para destilar complexidade em código limpo.",
+  "Transforma a pressão mental em potência física.",
+  "A universidade dá-te a base, mas és tu que constróis o teu próprio império.",
+  "Não te queixes do resultado que não tiveste devido ao trabalho que não fizeste.",
+  "Silêncio e execução. O teu sucesso fará todo o barulho necessário.",
+  "Estás a um bom treino de força de distância de uma mente completamente limpa.",
+  "Constrói sistemas e automatiza a tua vida para trabalhares de forma inteligente.",
+  "Não sejas apenas mais um espectador da tua própria vida. Assume o controlo total.",
+  "O código não mente. Se falhou, volta a analisar a lógica de cima a baixo.",
+  "A excelência não é um ato heroico isolado, é um hábito cimentado.",
+  "Aquilo que tu fazes no escuro, mais cedo ou mais tarde, vai colocar-te na luz.",
+  "Reclama zero. Executa tudo.",
+  "Mais um commit, mais um pequeno passo em direção ao objetivo principal.",
+  "Se queres resultados diferentes amanhã, tens de fazer escolhas desconfortáveis hoje.",
+  "A diferença entre o impossível e o possível está exclusivamente na tua determinação.",
+  "Treina a tua mente para extrair a lição de todas as situações, até no debug mais frustrante.",
+  "A disciplina é a única ponte fiável entre os teus objetivos e as tuas conquistas.",
+  "O amanhã é uma promessa vazia, o hoje é o único facto garantido. Usa-o agora.",
+  "Constrói algoritmos que trabalhem para ti, não passes a vida a trabalhar para os outros.",
+  "Domina o teu ofício ao ponto de seres inegável.",
+  "A tua única competição real e válida é contra a pessoa que eras ontem de manhã.",
+  "Visualiza a meta a longo prazo, mas apaixona-te pela rotina diária.",
+  "A resiliência resume-se a isto: cair sete vezes, levantar oito vezes mais forte.",
+  "Acorda. Planeia. Executa. Sem desculpas."
+]
+
+const iniciarNotificacoes = () => {
+  if (!('Notification' in window)) return;
+
+  Notification.requestPermission().then(permission => {
+    if (permission !== 'granted') return;
+
+    // // === CÓDIGO DE TESTE (Apaga depois de testares) ===
+    // setTimeout(() => {
+    //   new Notification("Picote Assist", { body: "Notificação de teste! O sistema operativo está a permitir os alertas.", icon: '/vite.svg' });
+    // }, 3000); // Apita 3 segundos após recarregares a página
+
+    // // Para testar o motor de refeições, altera temporariamente o intervalo lá em baixo de 60000 para 10000 (10 segundos) 
+    // // e muda uma das horas no mapa 'verificacoes' para o teu minuto exato atual.
+    // // ===================================================
+
+    // MOTOR DE MOTIVAÇÃO: Frases de impacto a cada 1 hora
+    setInterval(() => {
+      const frase = frasesMotivacionais[Math.floor(Math.random() * frasesMotivacionais.length)];
+      new Notification("Picote Assist", { body: frase, icon: '/vite.svg' });
+    }, 3600000);
+
+    // MOTOR DE REFEIÇÕES (Versão Visual de Teste com Quasar)
+    setInterval(async () => {
+      const agora = new Date();
+      const horaAtualStr = `${agora.getHours().toString().padStart(2, '0')}:${agora.getMinutes().toString().padStart(2, '0')}`;
+
+      const verificacoes = {
+        '11:30': 'Pequeno-Almoço',
+        '14:30': 'Almoço',
+        '18:30': 'Lanche',
+        '22:30': 'Jantar'
+      };
+
+      if (verificacoes[horaAtualStr]) {
+        const refeicao = verificacoes[horaAtualStr];
+        
+        // Truque: usa os segundos na chave para ele tentar 12 vezes dentro desse minuto, garantindo que vês!
+        const chaveControlo = `teste_refeicao_${horaAtualStr}_${Math.floor(agora.getSeconds() / 10)}`; 
+        
+        if (!localStorage.getItem(chaveControlo)) {
+          localStorage.setItem(chaveControlo, "true"); 
+          
+          const tokenDoUtilizador = localStorage.getItem('google_refresh_token');
+          if(!tokenDoUtilizador) return;
+
+          try {
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+            
+            const resposta = await fetch(`${backendUrl}/api/check_meal`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ meal_name: refeicao, token: tokenDoUtilizador })
+            });
+
+            if (resposta.ok) {
+              const dados = await resposta.json();
+              if (!dados.registered) {
+                // Usamos o Quasar em vez da notificação do sistema!
+                $q.notify({
+                  message: `Picote: Ainda não registaste o teu ${refeicao} de hoje!`,
+                  color: 'negative',
+                  position: 'top-right',
+                  icon: 'restaurant',
+                  timeout: 4000
+                });
+              }
+            }
+          } catch (e) {
+            console.error("Erro ao contactar o servidor:", e);
+          }
+        }
+      }
+    }, 5000); // Corre a cada 5 segundos
+  });
+}
+
 onMounted(() => {
   // 1. Aplica o Dark Mode guardado
   const savedDark = localStorage.getItem('darkMode') === 'true'
@@ -423,6 +552,8 @@ onMounted(() => {
   if (precisaLimparUrl) {
     window.history.replaceState({}, document.title, window.location.pathname);
   }
+
+  iniciarNotificacoes();
 })
 </script>
 
